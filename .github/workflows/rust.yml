@@ -1,4 +1,4 @@
-jkkname: Rust
+name: Rust
 
 on: [push, pull_request]
 

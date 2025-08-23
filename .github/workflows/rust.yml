@@ -23,7 +23,7 @@ jobs:
         run: |
           cargo install --locked cargo-deny
           cargo deny init
-          cargo deny check
+          cargo deny check advisories bans source
       - name: Build
         run: cargo build --verbose
       - name: Run tests

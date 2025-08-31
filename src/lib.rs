@@ -1,12 +1,29 @@
-use axum::{Router, http::StatusCode, routing::get};
+use axum::{
+    Form, Router,
+    http::StatusCode,
+    routing::{get, post},
+};
+use serde::Deserialize;
 use tokio::net::TcpListener;
+
+#[derive(Deserialize)]
+struct FormData {
+    email: String,
+    name: String,
+}
 
 async fn health_check() -> StatusCode {
     StatusCode::OK
 }
 
+async fn subscribe(_form: Form<FormData>) -> StatusCode {
+    StatusCode::OK
+}
+
 pub fn create_app() -> Router {
-    Router::new().route("/health", get(health_check))
+    Router::new()
+        .route("/health", get(health_check))
+        .route("/subscriptions", post(subscribe))
 }
 
 pub async fn run(listener: TcpListener) -> Result<(), std::io::Error> {

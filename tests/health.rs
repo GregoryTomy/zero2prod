@@ -9,11 +9,7 @@ async fn spawn_app() -> String {
 
     let port = listener.local_addr().unwrap().port();
 
-    tokio::spawn(async {
-        zero2prod::run(listener)
-            .await
-            .expect("Failed to start server");
-    });
+    tokio::spawn(zero2prod::run(listener));
 
     format!("http://127.0.0.1:{port}")
 }
@@ -23,8 +19,6 @@ async fn health_check_works() {
     // Arrange
     let address = spawn_app().await;
     let client = reqwest::Client::new();
-
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
     // Act
     let response = client
@@ -37,4 +31,51 @@ async fn health_check_works() {
 
     assert!(response.status().is_success());
     assert_eq!(Some(0), response.content_length());
+}
+
+#[tokio::test]
+async fn subscribe_returns_200_for_valid_form_data() {
+    let address = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let body = "name=rae%20boone&email=rae_boone%40gmail.com";
+
+    let response = client
+        .post(format!("{}/subscriptions", address))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    assert_eq!(200, response.status().as_u16());
+}
+
+#[tokio::test]
+async fn subscribe_returns_400_when_data_is_missing() {
+    let address = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let test_cases = vec![
+        ("name=rachel%20boone", "missing email"),
+        ("email=rachel_boone%40gmail.com", "missing name"),
+        ("", "missing both name and email"),
+    ];
+
+    for (invalid_body, error_message) in test_cases {
+        let response = client
+            .post(format!("{}/subscriptions", address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(invalid_body)
+            .send()
+            .await
+            .expect("Failed to execute request");
+
+        assert_eq!(
+            422,
+            response.status().as_u16(),
+            "The API did not fail with 400 Bad Request when payload was {}",
+            error_message
+        )
+    }
 }

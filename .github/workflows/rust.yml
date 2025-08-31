@@ -24,6 +24,12 @@ jobs:
           cargo install --locked cargo-deny
           cargo deny init
           cargo deny check advisories bans sources
+      - name: Install sqruff
+        uses: quarylabs/install-sqruff-cli-action@main
+      - name: SQL lint and fix
+        run: |
+          sqruff fix .
+          sqruff lint .
       - name: Build
         run: cargo build --verbose
       - name: Run tests

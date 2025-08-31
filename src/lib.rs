@@ -6,6 +6,7 @@ use axum::{
 use serde::Deserialize;
 use tokio::net::TcpListener;
 
+#[allow(dead_code)]
 #[derive(Deserialize)]
 struct FormData {
     email: String,

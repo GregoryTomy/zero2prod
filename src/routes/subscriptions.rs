@@ -1,10 +1,13 @@
+use axum::{Form, http::StatusCode};
+use serde::Deserialize;
+
 #[allow(dead_code)]
 #[derive(Deserialize)]
-struct FormData {
+pub struct FormData {
     email: String,
     name: String,
 }
 
-async fn subscribe(_form: Form<FormData>) -> StatusCode {
+pub async fn subscribe(_form: Form<FormData>) -> StatusCode {
     StatusCode::OK
 }

@@ -1,9 +1,9 @@
+use crate::routes::health_check;
+use crate::routes::subscribe;
 use axum::{
-    Form, Router,
-    http::StatusCode,
+    Router,
     routing::{get, post},
 };
-use serde::Deserialize;
 use tokio::net::TcpListener;
 
 pub fn create_app() -> Router {

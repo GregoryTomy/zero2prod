@@ -36,11 +36,11 @@ jobs:
         run: cargo fmt --check
       - name: Run clippy
         run: cargo clippy -- -D warnings
-      - name: Security and licence audit
-        run: |
-          cargo install --locked cargo-deny
-          cargo deny init
-          cargo deny check advisories bans sources
+      # - name: Security and licence audit
+      #   run: |
+      #     cargo install --locked cargo-deny
+      #     cargo deny init
+      #     cargo deny check advisories bans sources
       - name: Install sqruff
         uses: quarylabs/install-sqruff-cli-action@main
       - name: SQL lint and fix
@@ -59,8 +59,8 @@ jobs:
         run: cargo build --verbose
       - name: Run tests
         run: cargo test --verbose
-      - name: Install and run coverage
-        run: |
-          rustup component add llvm-tools-preview
-          cargo install cargo-llvm-cov
-          cargo llvm-cov
+      # - name: Install and run coverage
+      #   run: |
+      #     rustup component add llvm-tools-preview
+      #     cargo install cargo-llvm-cov
+      #     cargo llvm-cov

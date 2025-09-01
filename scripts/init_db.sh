@@ -24,7 +24,7 @@ DB_NAME="${POSTGRES_NAME:=newsletter}"
 DB_PORT="${POSTGRES_PORT:=5433}"
 DB_HOST="${POSTGRES_HOST:=localhost}"
 
-if [[-z "${SKIP_DOCKER}"]]; then
+if [[-z "${SKIP_DOCKER}" ]]; then
   docker run \
     -e POSTGRES_USER=${DB_USER} \
     -e POSTGRES_PASSWORD=${DB_PASSWORD} \

@@ -1,9 +1,13 @@
-//! tests/health_check.rs
+//! tests/health.rs
 
 use sqlx::{Connection, Executor, PgConnection, PgPool};
+use std::sync::OnceLock;
 use tokio::net::TcpListener;
 use uuid::Uuid;
 use zero2prod::configurations::{DatabaseSettings, get_configuration};
+use zero2prod::telemetry::{get_subscriber, init_subcriber};
+
+static TRACING: OnceLock<()> = OnceLock::new();
 
 pub struct TestApp {
     pub address: String,
@@ -11,6 +15,19 @@ pub struct TestApp {
 }
 
 async fn spawn_app() -> TestApp {
+    TRACING.get_or_init(|| {
+        let default_filter_level = "info".to_string();
+        let subscriber_name = "test".to_string();
+
+        if std::env::var("TEST_LOG").is_ok() {
+            let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
+            init_subcriber(subscriber);
+        } else {
+            let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::sink);
+            init_subcriber(subscriber);
+        }
+    });
+
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("Failed to bind random port");

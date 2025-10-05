@@ -1,3 +1,4 @@
+use secrecy::ExposeSecret;
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 use zero2prod::configurations::get_configuration;
@@ -13,7 +14,7 @@ async fn main() -> Result<(), std::io::Error> {
     let configuration = get_configuration().expect("Failed to read configuration");
 
     let address = format!("127.0.0.1:{}", configuration.application_port);
-    let db_pool = PgPool::connect(&configuration.database.connection_string())
+    let db_pool = PgPool::connect(&configuration.database.connection_string().expose_secret())
         .await
         .expect("Failed to get configuration.");
 

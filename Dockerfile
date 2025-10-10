@@ -21,7 +21,7 @@ ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin zero2prod
 
 # Runtime stage
-FROM gcr.io/distroless/cc-debian12 AS runtime
+FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
 COPY --from=builder /app/target/release/zero2prod zero2prod

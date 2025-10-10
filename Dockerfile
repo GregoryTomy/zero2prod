@@ -1,5 +1,5 @@
 # Base stage
-FROM rust:1.90.0-bookworm AS chef
+FROM rust:1.90.0 AS chef
 RUN cargo install --locked cargo-chef
 RUN apt update && apt install -y mold
 ENV RUSTFLAGS="-C strip=symbols -C link-arg=-fuse-ld=mold"
@@ -21,7 +21,7 @@ ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin zero2prod
 
 # Runtime stage
-FROM debian:bookworm-slim AS runtime
+FROM gcr.io/distroless/cc-debian12 AS runtime
 WORKDIR /app
 
 COPY --from=builder /app/target/release/zero2prod zero2prod

@@ -21,8 +21,17 @@ ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin zero2prod
 
 # Runtime stage
-FROM gcr.io/distroless/cc-debian12 AS runtime
+FROM ubuntu:24.04 AS runtime
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/* \
+    && rm -rf /usr/share/doc/* \
+    && rm -rf /usr/share/man/* \
+    && rm -rf /tmp/*
 
 COPY --from=builder /app/target/release/zero2prod zero2prod
 COPY configuration configuration

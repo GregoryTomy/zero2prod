@@ -1,5 +1,5 @@
 # Base stage
-FROM rust:1.90.0 AS chef
+FROM rust:1.90.0-bookworm AS chef
 RUN cargo install --locked cargo-chef
 RUN apt update && apt install -y mold
 ENV RUSTFLAGS="-C strip=symbols -C link-arg=-fuse-ld=mold"

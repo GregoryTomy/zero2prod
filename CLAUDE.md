@@ -37,12 +37,17 @@ This is a Rust web application built with Axum for creating a newsletter subscri
 - **Tower-HTTP**: HTTP middleware including request tracing
 - **Configuration-driven**: Uses YAML configuration files
 - **Secrecy**: Secure handling of sensitive data (passwords, connection strings) using `secrecy` crate with `SecretString`
+- **Domain-Driven Design**: Type-driven development with domain types and validation
+- **Unicode Segmentation**: Unicode-aware text processing with `unicode-segmentation` crate
 
 ### Module Organization
 - `src/main.rs` - Application entry point with telemetry initialization
 - `src/lib.rs` - Module declarations
 - `src/startup.rs` - Server startup logic, route configuration, and HTTP tracing middleware
 - `src/configurations.rs` - Configuration management and database settings
+- `src/domain.rs` - Domain types and business logic with validation
+  - `SubscriberName` - Type-safe subscriber name with validation
+  - `NewSubscriber` - Domain model for new subscriptions
 - `src/routes/` - HTTP route handlers
   - `health_check.rs` - Health check endpoint
   - `subscriptions.rs` - Newsletter subscription endpoint with database persistence
@@ -96,6 +101,25 @@ This is a Rust web application built with Axum for creating a newsletter subscri
 - Application port and host configuration
 - Secure password handling using `SecretString` from the `secrecy` crate
 - Passwords exposed only when needed via `.expose_secret()` within `PgConnectOptions`
+
+**Domain Layer**: Type-driven development with domain types and validation:
+- **Type Safety**: Domain types encapsulate business logic and enforce invariants at compile time
+- **Parse, Don't Validate**: Uses constructor functions (`parse`) instead of validation functions
+  - Constructor returns a valid instance or panics (will be enhanced with `Result` for error handling)
+  - Once created, domain types guarantee their invariants are maintained
+- **SubscriberName Type**: Validated subscriber name with constraints:
+  - Must not be empty or whitespace-only
+  - Maximum length: 256 graphemes (Unicode-aware using `unicode-segmentation` crate)
+  - Forbidden characters: `/ ( ) " < > \ { }`
+  - Uses newtype pattern (`SubscriberName(String)`) to prevent misuse
+  - Implements `AsRef<str>` for ergonomic string access without exposing inner `String`
+- **NewSubscriber Model**: Domain model for subscription requests
+  - Combines validated `SubscriberName` with email string
+  - Used in route handlers to ensure only valid data reaches database layer
+- **Ownership and Borrowing**: Leverages Rust's ownership system
+  - `parse` takes ownership of `String` to construct domain type
+  - `AsRef<str>` allows borrowing the inner string without exposing mutation
+  - Database queries use `.as_ref()` to access the validated string slice
 
 ### Database Schema
 The application manages newsletter subscriptions with a `subscriptions` table containing:
@@ -160,6 +184,20 @@ GitHub Actions workflow with:
 ---
 
 ## Documentation Update Log
+
+### 2025-10-12 (Commit: 62d5327)
+**Major Changes:**
+- Introduced domain-driven design with type-safe domain layer (`src/domain.rs`)
+- Added `SubscriberName` newtype with validation logic:
+  - Unicode-aware length validation (max 256 graphemes)
+  - Forbidden character filtering
+  - Empty/whitespace validation
+- Implemented "Parse, Don't Validate" pattern with constructor function
+- Added `NewSubscriber` domain model for type-safe subscription handling
+- Integrated `unicode-segmentation` crate for proper Unicode text handling
+- Implemented `AsRef<str>` trait for ergonomic string access
+- Updated subscription route to use domain types for validation
+- Enhanced type safety by moving validation from route layer to domain layer
 
 ### 2025-10-12 (Commits: a73e6ec..eb4b339)
 **Major Changes:**

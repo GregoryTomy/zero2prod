@@ -50,9 +50,14 @@ pub async fn insert_subsriber(
     )
 )]
 pub async fn subscribe(State(pool): State<PgPool>, Form(form): Form<FormData>) -> StatusCode {
+    let name = match SubscriberName::parse(form.name) {
+        Ok(name) => name,
+        Err(_) => return StatusCode::BAD_REQUEST,
+    };
+
     let new_subscriber = NewSubscriber {
         email: form.email,
-        name: SubscriberName::parse(form.name),
+        name,
     };
 
     match insert_subsriber(&pool, &new_subscriber).await {

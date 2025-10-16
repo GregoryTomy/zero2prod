@@ -13,6 +13,7 @@ name = "zero2prod"
 
 [dependencies]
 axum = "0.8.4"
+assertables= "9.8.2"
 tokio = { version = "1.47.1", features = ["full"] }
 tower-http = {version = "0.6", features= ["trace"]}
 tracing = {version ="0.1", features =["log"]}

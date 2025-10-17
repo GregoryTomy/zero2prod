@@ -3,7 +3,7 @@ use serde::Deserialize;
 use sqlx::{PgPool, types::chrono::Utc};
 use uuid::Uuid;
 
-use crate::domain::{NewSubscriber, SubscriberName};
+use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -26,7 +26,7 @@ pub async fn insert_subsriber(
         values ($1, $2, $3, $4)
         "#,
         Uuid::new_v4(),
-        new_subscriber.email,
+        new_subscriber.email.as_ref(),
         new_subscriber.name.as_ref(),
         Utc::now(),
     )
@@ -55,10 +55,12 @@ pub async fn subscribe(State(pool): State<PgPool>, Form(form): Form<FormData>) -
         Err(_) => return StatusCode::BAD_REQUEST,
     };
 
-    let new_subscriber = NewSubscriber {
-        email: form.email,
-        name,
+    let email = match SubscriberEmail::parse(form.email) {
+        Ok(email) => email,
+        Err(_) => return StatusCode::BAD_REQUEST,
     };
+
+    let new_subscriber = NewSubscriber { email, name };
 
     match insert_subsriber(&pool, &new_subscriber).await {
         Ok(_) => {

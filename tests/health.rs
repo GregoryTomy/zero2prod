@@ -5,6 +5,7 @@ use std::sync::OnceLock;
 use tokio::net::TcpListener;
 use uuid::Uuid;
 use zero2prod::configurations::{DatabaseSettings, get_configuration};
+use zero2prod::email_client::EmailClient;
 use zero2prod::telemetry::{get_subscriber, init_subcriber};
 
 static TRACING: OnceLock<()> = OnceLock::new();
@@ -38,9 +39,20 @@ async fn spawn_app() -> TestApp {
     let mut configuration = get_configuration().expect("Failed to read configuration.");
     configuration.database.database_name = Uuid::new_v4().to_string();
 
+    let sender = configuration
+        .email_client
+        .sender()
+        .expect("Invalid email address provided");
+
+    let email_client = EmailClient::new(configuration.email_client.base_url, sender);
+
     let connection_pool = configure_databse(&configuration.database).await;
 
-    tokio::spawn(zero2prod::startup::run(listener, connection_pool.clone()));
+    tokio::spawn(zero2prod::startup::run(
+        listener,
+        connection_pool.clone(),
+        email_client,
+    ));
 
     TestApp {
         address,

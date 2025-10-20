@@ -1,9 +1,13 @@
 use axum::{Form, extract::State, http::StatusCode};
 use serde::Deserialize;
 use sqlx::{PgPool, types::chrono::Utc};
+use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
+use crate::{
+    domain::{NewSubscriber, SubscriberEmail, SubscriberName},
+    email_client::{self, EmailClient},
+};
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -53,14 +57,17 @@ pub async fn insert_subsriber(
 
 #[tracing::instrument(
     name="Adding new subscriber",
-    skip(form, pool),
+    skip(form, pool, email_client),
     fields(
         request_id=%Uuid::new_v4(),
         subscriber_email=%form.email,
         subscriber_name=%form.name,
     )
 )]
-pub async fn subscribe(State(pool): State<PgPool>, Form(form): Form<FormData>) -> StatusCode {
+pub async fn subscribe(
+    State((pool, email_client)): State<(PgPool, Arc<EmailClient>)>,
+    Form(form): Form<FormData>,
+) -> StatusCode {
     let new_subscriber = match form.try_into() {
         Ok(subscriber) => subscriber,
         Err(_) => return StatusCode::BAD_REQUEST,

@@ -10,6 +10,12 @@ pub struct Settings {
 }
 
 #[derive(Deserialize)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    pub sender_email: String,
+}
+
+#[derive(Deserialize)]
 pub struct ApplicationSettings {
     pub port: u16,
     pub host: String,

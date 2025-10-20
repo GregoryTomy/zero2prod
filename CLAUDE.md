@@ -39,15 +39,20 @@ This is a Rust web application built with Axum for creating a newsletter subscri
 - **Secrecy**: Secure handling of sensitive data (passwords, connection strings) using `secrecy` crate with `SecretString`
 - **Domain-Driven Design**: Type-driven development with domain types and validation
 - **Unicode Segmentation**: Unicode-aware text processing with `unicode-segmentation` crate
+- **Email Client**: HTTP-based email client using `reqwest` with TLS support for sending transactional emails
+- **Validator**: Email validation using `validator` crate with `ValidateEmail` trait
 
 ### Module Organization
 - `src/main.rs` - Application entry point with telemetry initialization
 - `src/lib.rs` - Module declarations
 - `src/startup.rs` - Server startup logic, route configuration, and HTTP tracing middleware
 - `src/configurations.rs` - Configuration management and database settings
-- `src/domain.rs` - Domain types and business logic with validation
-  - `SubscriberName` - Type-safe subscriber name with validation
-  - `NewSubscriber` - Domain model for new subscriptions
+- `src/email_client.rs` - Email client for sending transactional emails
+- `src/domain/` - Domain types and business logic with validation
+  - `mod.rs` - Module exports and re-exports
+  - `subscriber_name.rs` - Type-safe subscriber name with validation
+  - `subscriber_email.rs` - Type-safe email with validation using `validator` crate
+  - `new_subscriber.rs` - Domain model for new subscriptions
 - `src/routes/` - HTTP route handlers
   - `health_check.rs` - Health check endpoint
   - `subscriptions.rs` - Newsletter subscription endpoint with database persistence
@@ -55,10 +60,12 @@ This is a Rust web application built with Axum for creating a newsletter subscri
 
 ### Key Components
 
-**Application Setup**: The app creates an Axum router with shared database state:
+**Application Setup**: The app creates an Axum router with shared state:
 - `GET /health` - Health check endpoint
 - `POST /subscriptions` - Newsletter subscription endpoint with database persistence
-- Database connection pool shared across all routes via Axum state
+- Shared state via Axum state management:
+  - Database connection pool (`PgPool`)
+  - Email client (`Arc<EmailClient>`) for sending transactional emails
 - HTTP request tracing middleware for observability
 
 **Telemetry**: Structured logging and observability features:
@@ -99,13 +106,16 @@ This is a Rust web application built with Axum for creating a newsletter subscri
   - `require_ssl` flag for SSL/TLS enforcement
   - Uses `PgConnectOptions` builder pattern instead of connection strings
 - Application port and host configuration
+- Email client settings:
+  - `base_url` - Email service provider API endpoint
+  - `sender_email` - Validated sender email address (parsed via `SubscriberEmail::parse`)
 - Secure password handling using `SecretString` from the `secrecy` crate
 - Passwords exposed only when needed via `.expose_secret()` within `PgConnectOptions`
 
 **Domain Layer**: Type-driven development with domain types and validation:
 - **Type Safety**: Domain types encapsulate business logic and enforce invariants at compile time
 - **Parse, Don't Validate**: Uses constructor functions (`parse`) instead of validation functions
-  - Constructor returns a valid instance or panics (will be enhanced with `Result` for error handling)
+  - Constructor returns `Result<T, String>` for error handling
   - Once created, domain types guarantee their invariants are maintained
 - **SubscriberName Type**: Validated subscriber name with constraints:
   - Must not be empty or whitespace-only
@@ -113,13 +123,35 @@ This is a Rust web application built with Axum for creating a newsletter subscri
   - Forbidden characters: `/ ( ) " < > \ { }`
   - Uses newtype pattern (`SubscriberName(String)`) to prevent misuse
   - Implements `AsRef<str>` for ergonomic string access without exposing inner `String`
+- **SubscriberEmail Type**: Validated email address with constraints:
+  - Uses `validator` crate's `ValidateEmail` trait for RFC-compliant email validation
+  - Returns `Result<SubscriberEmail, String>` from `parse` constructor
+  - Uses newtype pattern (`SubscriberEmail(String)`) to prevent misuse
+  - Implements `AsRef<str>` for ergonomic string access
 - **NewSubscriber Model**: Domain model for subscription requests
-  - Combines validated `SubscriberName` with email string
+  - Combines validated `SubscriberEmail` and `SubscriberName`
   - Used in route handlers to ensure only valid data reaches database layer
+  - Implements `TryFrom<FormData>` for type-safe conversion from HTTP form data
 - **Ownership and Borrowing**: Leverages Rust's ownership system
   - `parse` takes ownership of `String` to construct domain type
   - `AsRef<str>` allows borrowing the inner string without exposing mutation
   - Database queries use `.as_ref()` to access the validated string slice
+
+**Email Client**: HTTP-based client for sending transactional emails:
+- **Structure**: `EmailClient` struct with:
+  - `http_client` - `reqwest::Client` for making HTTP requests
+  - `base_url` - Email service provider API endpoint
+  - `sender` - Validated `SubscriberEmail` for the sender address
+- **Features**:
+  - Async email sending via `send_email` method
+  - Type-safe recipient addresses using `SubscriberEmail` domain type
+  - Support for both HTML and plain text content
+  - Built on `reqwest` with TLS support (rustls-tls)
+- **Integration**:
+  - Configured via YAML settings in `EmailClientSettings`
+  - Sender email validated at startup via `SubscriberEmail::parse`
+  - Shared across routes via `Arc<EmailClient>` in Axum state
+- **Implementation Status**: Core structure implemented, `send_email` method pending implementation
 
 ### Database Schema
 The application manages newsletter subscriptions with a `subscriptions` table containing:
@@ -180,10 +212,45 @@ GitHub Actions workflow with:
 - **Test Database Setup**: Each test creates a unique database using UUID naming
 - **Automatic Cleanup**: Test databases are isolated and don't interfere with each other
 - **Migration Testing**: Database migrations are run automatically in test setup
+- **Property-Based Testing**: Uses `quickcheck` and `fake` crates for:
+  - Generating arbitrary test data
+  - Testing domain invariants with randomized inputs
+  - Email validation testing with generated valid emails via `SafeEmail` faker
+  - Custom `Arbitrary` implementations for domain-specific test fixtures
+- **Assertion Library**: Uses `assertables` crate for ergonomic test assertions (e.g., `assert_err!`)
 
 ---
 
 ## Documentation Update Log
+
+### 2025-10-20 (Commits: 39b20de..1650ed3)
+**Major Changes:**
+- **Email Client Implementation**:
+  - Added `src/email_client.rs` with `EmailClient` struct for sending transactional emails
+  - Integrated `reqwest` crate with JSON and rustls-tls features for HTTP client
+  - Email client configured via `EmailClientSettings` in configuration system
+  - Sender email validated at startup using domain validation
+  - Email client shared across routes via `Arc<EmailClient>` in Axum state
+- **Enhanced Domain Layer**:
+  - Added `SubscriberEmail` domain type with email validation
+  - Implemented email validation using `validator` crate's `ValidateEmail` trait
+  - Refactored domain layer into separate files (`subscriber_name.rs`, `subscriber_email.rs`, `new_subscriber.rs`)
+  - Updated `NewSubscriber` to use both `SubscriberEmail` and `SubscriberName` domain types
+  - Implemented `TryFrom<FormData>` trait for type-safe conversion from HTTP forms
+- **Property-Based Testing**:
+  - Integrated `quickcheck` and `quickcheck_macros` for property-based testing
+  - Added `fake` crate for generating realistic test data
+  - Implemented custom `Arbitrary` trait for `ValidEmailFixture` test fixture
+  - Added property-based tests for email validation using generated data
+- **Configuration Updates**:
+  - Added `email_client` section to configuration system
+  - Email client settings include `base_url` and `sender_email`
+  - Sender email validated via `SubscriberEmail::parse` in configuration
+  - Configuration supports local and production email service endpoints
+- **Testing Improvements**:
+  - Added `assertables` crate for ergonomic assertions
+  - Enhanced test coverage with property-based testing for domain validation
+  - Test setup updated to initialize email client for integration tests
 
 ### 2025-10-12 (Commit: 62d5327)
 **Major Changes:**

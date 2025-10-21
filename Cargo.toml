@@ -15,7 +15,7 @@ name = "zero2prod"
 axum = "0.8.4"
 assertables= "9.8.2"
 reqwest = {version= "0.12.23", default-features = false, features = ["json", "rustls-tls"]}
-tokio = { version = "1.47.1", features = ["full"] }
+tokio = { version = "1.47.1", features = ["rt", "macros", "rt-multi-thread"] }
 tower-http = {version = "0.6", features= ["trace"]}
 tracing = {version ="0.1", features =["log"]}
 tracing-bunyan-formatter = "0.3.10"
@@ -40,3 +40,4 @@ config = "0.15.15"
 fake = "4.4.0"
 quickcheck = "1.0.3"
 quickcheck_macros = "1.1.0"
+wiremock = "0.6.5"

@@ -33,9 +33,10 @@ This is a Rust web application built with Axum for creating a newsletter subscri
 - **Axum Framework**: Web server framework with async/await support
 - **SQLx**: Type-safe SQL toolkit for PostgreSQL integration with connection pooling
 - **UUID**: Unique identifier generation with `uuid` crate (v4 UUIDs)
+- **Tokio Runtime**: Async runtime with optimized feature flags (`rt`, `macros`, `rt-multi-thread`) for smaller binary size
 - **Tracing**: Structured logging and telemetry with `tracing` and `tracing-subscriber`
 - **Tower-HTTP**: HTTP middleware including request tracing
-- **Configuration-driven**: Uses YAML configuration files
+- **Configuration-driven**: Uses YAML configuration files with layered base/environment-specific approach
 - **Secrecy**: Secure handling of sensitive data (passwords, connection strings) using `secrecy` crate with `SecretString`
 - **Domain-Driven Design**: Type-driven development with domain types and validation
 - **Unicode Segmentation**: Unicode-aware text processing with `unicode-segmentation` crate
@@ -140,18 +141,23 @@ This is a Rust web application built with Axum for creating a newsletter subscri
 **Email Client**: HTTP-based client for sending transactional emails:
 - **Structure**: `EmailClient` struct with:
   - `http_client` - `reqwest::Client` for making HTTP requests
-  - `base_url` - Email service provider API endpoint
+  - `base_url` - Email service provider API endpoint (Postmark in production, localhost in dev)
   - `sender` - Validated `SubscriberEmail` for the sender address
 - **Features**:
   - Async email sending via `send_email` method
   - Type-safe recipient addresses using `SubscriberEmail` domain type
   - Support for both HTML and plain text content
   - Built on `reqwest` with TLS support (rustls-tls)
+  - JSON serialization via `serde` for email request payloads
 - **Integration**:
   - Configured via YAML settings in `EmailClientSettings`
   - Sender email validated at startup via `SubscriberEmail::parse`
   - Shared across routes via `Arc<EmailClient>` in Axum state
-- **Implementation Status**: Core structure implemented, `send_email` method pending implementation
+  - Email client initialized in both `main.rs` and test setup with validated sender
+- **Testing**:
+  - Unit tests using `wiremock` crate for HTTP mocking
+  - Mock server simulates email service provider responses
+  - Tests verify request dispatch to correct endpoint
 
 ### Database Schema
 The application manages newsletter subscriptions with a `subscriptions` table containing:
@@ -217,11 +223,44 @@ GitHub Actions workflow with:
   - Testing domain invariants with randomized inputs
   - Email validation testing with generated valid emails via `SafeEmail` faker
   - Custom `Arbitrary` implementations for domain-specific test fixtures
+- **HTTP Mocking**: Uses `wiremock` crate for testing HTTP clients:
+  - Mock server creation for simulating external API responses
+  - Request matching and verification
+  - Testing email client without hitting real email service providers
 - **Assertion Library**: Uses `assertables` crate for ergonomic test assertions (e.g., `assert_err!`)
 
 ---
 
 ## Documentation Update Log
+
+### 2025-10-21 (Commits: 9120863..ead093b + staged changes)
+**Major Changes:**
+- **Email Client Completion**:
+  - Implemented `send_email` method with HTTP POST request to email service
+  - Added `SendEmailRequest` struct with `serde` serialization for JSON payloads
+  - Email client now sends to `{base_url}/email` endpoint
+  - Request includes sender, recipient, subject, HTML and text body
+- **HTTP Mocking for Tests**:
+  - Integrated `wiremock` crate (v0.6.5) for HTTP testing
+  - Added unit tests for email client using mock servers
+  - Tests verify request dispatching without hitting real email APIs
+  - Mock server validates email sending behavior
+- **Tokio Runtime Optimization**:
+  - Changed from `features = ["full"]` to specific features: `rt`, `macros`, `rt-multi-thread`
+  - Reduces binary size by excluding unused Tokio features
+  - Maintains all required async runtime functionality
+- **Configuration Consolidation**:
+  - Removed root-level `configuration.yaml` file
+  - All configuration now uses layered approach: `base.yaml` + environment-specific overlays
+  - Email client settings added to both `base.yaml` and `production.yaml`
+  - Production uses Postmark API (`https://api.postmarkapp.com`)
+  - Local development uses localhost for email testing
+- **Additional Dependencies**:
+  - `assert-json-diff` (v2.0.2) - JSON comparison utilities
+  - `deadpool` (v0.12.3) - Connection pool for wiremock
+  - `futures` (v0.3.31) - Async utilities for wiremock
+  - `h2` (v0.4.12) - HTTP/2 support for hyper
+  - `tokio-util` (v0.7.16) - Additional Tokio utilities
 
 ### 2025-10-20 (Commits: 39b20de..1650ed3)
 **Major Changes:**

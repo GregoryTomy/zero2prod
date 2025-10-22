@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 use tokio::net::TcpListener;
-use zero2prod::configurations::{EmailClientSettings, get_configuration};
+use zero2prod::configurations::get_configuration;
 use zero2prod::email_client::EmailClient;
 use zero2prod::startup::run;
 use zero2prod::telemetry::{get_subscriber, init_subcriber};
@@ -28,7 +28,11 @@ async fn main() -> Result<(), std::io::Error> {
         .sender()
         .expect("Invalid sneder email address");
 
-    let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
+    let email_client = EmailClient::new(
+        configuration.email_client.base_url,
+        sender_email,
+        configuration.email_client.authorization_token,
+    );
 
     run(listener, db_pool, email_client).await
 }

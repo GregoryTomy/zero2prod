@@ -44,7 +44,11 @@ async fn spawn_app() -> TestApp {
         .sender()
         .expect("Invalid email address provided");
 
-    let email_client = EmailClient::new(configuration.email_client.base_url, sender);
+    let email_client = EmailClient::new(
+        configuration.email_client.base_url,
+        sender,
+        configuration.email_client.authorization_token,
+    );
 
     let connection_pool = configure_databse(&configuration.database).await;
 

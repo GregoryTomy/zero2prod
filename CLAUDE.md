@@ -110,8 +110,11 @@ This is a Rust web application built with Axum for creating a newsletter subscri
 - Email client settings:
   - `base_url` - Email service provider API endpoint
   - `sender_email` - Validated sender email address (parsed via `SubscriberEmail::parse`)
-- Secure password handling using `SecretString` from the `secrecy` crate
-- Passwords exposed only when needed via `.expose_secret()` within `PgConnectOptions`
+  - `authorization_token` - API authentication token wrapped in `SecretString`
+- Secure sensitive data handling using `SecretString` from the `secrecy` crate
+  - Database passwords exposed only when needed via `.expose_secret()` within `PgConnectOptions`
+  - Email authorization tokens exposed only when setting HTTP headers via `.expose_secret()`
+  - Tokens remain wrapped in `SecretString` during transport through application layers
 
 **Domain Layer**: Type-driven development with domain types and validation:
 - **Type Safety**: Domain types encapsulate business logic and enforce invariants at compile time
@@ -143,21 +146,26 @@ This is a Rust web application built with Axum for creating a newsletter subscri
   - `http_client` - `reqwest::Client` for making HTTP requests
   - `base_url` - Email service provider API endpoint (Postmark in production, localhost in dev)
   - `sender` - Validated `SubscriberEmail` for the sender address
+  - `authorization_token` - API token wrapped in `SecretString` for secure credential handling
 - **Features**:
-  - Async email sending via `send_email` method
+  - Async email sending via `send_email` method with `Result<(), reqwest::Error>` return type
   - Type-safe recipient addresses using `SubscriberEmail` domain type
   - Support for both HTML and plain text content
   - Built on `reqwest` with TLS support (rustls-tls)
   - JSON serialization via `serde` for email request payloads
+  - Authentication via `X-Postmark-Server-Token` HTTP header
+  - Secure token handling: `authorization_token` exposed only when setting HTTP headers
 - **Integration**:
   - Configured via YAML settings in `EmailClientSettings`
   - Sender email validated at startup via `SubscriberEmail::parse`
+  - Authorization token loaded from configuration as `SecretString`
   - Shared across routes via `Arc<EmailClient>` in Axum state
-  - Email client initialized in both `main.rs` and test setup with validated sender
+  - Email client initialized in both `main.rs` and test setup with validated sender and token
 - **Testing**:
   - Unit tests using `wiremock` crate for HTTP mocking
   - Mock server simulates email service provider responses
   - Tests verify request dispatch to correct endpoint
+  - Generated fake tokens via `Faker.fake::<String>()` for test isolation
 
 ### Database Schema
 The application manages newsletter subscriptions with a `subscriptions` table containing:
@@ -232,6 +240,28 @@ GitHub Actions workflow with:
 ---
 
 ## Documentation Update Log
+
+### 2025-10-22 (Unstaged changes: Authorization token integration)
+**Major Changes:**
+- **Email Client Authentication**:
+  - Added `authorization_token` field to `EmailClientSettings` as `SecretString`
+  - Updated `EmailClient` to accept and store authorization token securely
+  - Implemented Postmark authentication via `X-Postmark-Server-Token` HTTP header
+  - Token exposed only at point of use (`.expose_secret()` when setting HTTP headers)
+  - Updated `send_email` return type from `Result<(), String>` to `Result<(), reqwest::Error>`
+  - Email request now properly sent via `.send().await?` instead of just building the request
+- **Configuration Updates**:
+  - Added `authorization_token` to `configuration/base.yaml` for local development
+  - Authorization token automatically deserialized as `SecretString` from YAML config
+  - Environment variable support: `APP_EMAIL_CLIENT__AUTHORIZATION_TOKEN`
+- **Security Enhancement**:
+  - Demonstrates proper `SecretString` usage pattern throughout application layers
+  - Tokens remain wrapped during transport, exposed only at exact point of use
+  - Consistent with database password handling using `secrecy` crate
+- **Test Updates**:
+  - Test email client initialization updated to include fake authorization token
+  - Uses `Faker.fake::<String>()` to generate realistic test tokens
+  - Removed unused import in `src/routes/subscriptions.rs`
 
 ### 2025-10-21 (Commits: 9120863..ead093b + staged changes)
 **Major Changes:**

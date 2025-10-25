@@ -42,6 +42,7 @@ This is a Rust web application built with Axum for creating a newsletter subscri
 - **Unicode Segmentation**: Unicode-aware text processing with `unicode-segmentation` crate
 - **Email Client**: HTTP-based email client using `reqwest` with TLS support for sending transactional emails
 - **Validator**: Email validation using `validator` crate with `ValidateEmail` trait
+- **Serde JSON**: JSON parsing and manipulation with `serde_json` for test assertions and runtime validation
 
 ### Module Organization
 - `src/main.rs` - Application entry point with telemetry initialization
@@ -152,7 +153,8 @@ This is a Rust web application built with Axum for creating a newsletter subscri
   - Type-safe recipient addresses using `SubscriberEmail` domain type
   - Support for both HTML and plain text content
   - Built on `reqwest` with TLS support (rustls-tls)
-  - JSON serialization via `serde` for email request payloads
+  - JSON serialization via `serde` for email request payloads with `#[serde(rename_all = "PascalCase")]`
+  - Zero-copy serialization using lifetime-parameterized `SendEmailRequest<'a>` with string slices
   - Authentication via `X-Postmark-Server-Token` HTTP header
   - Secure token handling: `authorization_token` exposed only when setting HTTP headers
 - **Integration**:
@@ -163,8 +165,10 @@ This is a Rust web application built with Axum for creating a newsletter subscri
   - Email client initialized in both `main.rs` and test setup with validated sender and token
 - **Testing**:
   - Unit tests using `wiremock` crate for HTTP mocking
+  - Custom `SendEmailBodyMatcher` validates JSON request structure
   - Mock server simulates email service provider responses
-  - Tests verify request dispatch to correct endpoint
+  - Tests verify request headers, path, method, and body structure
+  - Validates PascalCase field names (`From`, `To`, `Subject`, `HtmlBody`, `TextBody`)
   - Generated fake tokens via `Faker.fake::<String>()` for test isolation
 
 ### Database Schema
@@ -233,7 +237,9 @@ GitHub Actions workflow with:
   - Custom `Arbitrary` implementations for domain-specific test fixtures
 - **HTTP Mocking**: Uses `wiremock` crate for testing HTTP clients:
   - Mock server creation for simulating external API responses
-  - Request matching and verification
+  - Custom matchers implementing `wiremock::Match` trait for request validation
+  - JSON body validation with `SendEmailBodyMatcher` for email client tests
+  - Request matching on headers, paths, methods, and body structure
   - Testing email client without hitting real email service providers
 - **Assertion Library**: Uses `assertables` crate for ergonomic test assertions (e.g., `assert_err!`)
 
@@ -241,7 +247,29 @@ GitHub Actions workflow with:
 
 ## Documentation Update Log
 
-### 2025-10-22 (Unstaged changes: Authorization token integration)
+### 2025-10-25 (Unstaged changes: Email client optimizations)
+**Major Changes:**
+- **Performance Optimizations**:
+  - Refactored `SendEmailRequest` to use lifetimes and string slices (`&'a str`) instead of owned `String`
+  - Eliminates unnecessary `.to_owned()` calls in email request construction
+  - Reduces memory allocations during email sending
+  - Uses zero-copy string references for `from`, `to`, `subject`, `html_body`, and `text_body` fields
+- **Enhanced Test Coverage**:
+  - Added custom `SendEmailBodyMatcher` implementing `wiremock::Match` trait
+  - Validates JSON request body structure and PascalCase field names
+  - Verifies presence of all required fields: `From`, `To`, `Subject`, `HtmlBody`, `TextBody`
+  - Improved mock expectations with granular request validation
+  - Test renamed to `send_email_sends_the_expected_response` for clarity
+  - Enhanced mock setup with specific matchers: `header_exists`, `header`, `path`, `method`
+- **Dependency Updates**:
+  - Added `serde_json` (v1.0.145) for JSON parsing in test assertions
+  - Enables runtime JSON validation in custom wiremock matchers
+- **Code Quality**:
+  - Fixed unused variable warning by prefixing with underscore (`_builder`)
+  - Demonstrates proper lifetime annotations with generic structs
+  - Shows zero-copy serialization pattern with borrowed data
+
+### 2025-10-22 (Commit: 768f64d - Authorization token integration)
 **Major Changes:**
 - **Email Client Authentication**:
   - Added `authorization_token` field to `EmailClientSettings` as `SecretString`

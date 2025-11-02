@@ -1,9 +1,8 @@
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::OnceLock;
-use tokio::net::TcpListener;
 use uuid::Uuid;
 use zero2prod::configurations::{DatabaseSettings, get_configuration};
-use zero2prod::email_client::EmailClient;
+use zero2prod::startup::Application;
 use zero2prod::telemetry::{get_subscriber, init_subcriber};
 
 static TRACING: OnceLock<()> = OnceLock::new();
@@ -27,34 +26,19 @@ pub async fn spawn_app() -> TestApp {
         }
     });
 
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("Failed to bind random port");
-
-    let port = listener.local_addr().unwrap().port();
-    let address = format!("http://127.0.0.1:{port}");
-
     let mut configuration = get_configuration().expect("Failed to read configuration.");
     configuration.database.database_name = Uuid::new_v4().to_string();
-
-    let sender = configuration
-        .email_client
-        .sender()
-        .expect("Invalid email address provided");
-
-    let email_client = EmailClient::new(
-        configuration.email_client.base_url,
-        sender,
-        configuration.email_client.authorization_token,
-    );
+    configuration.application.port = 0;
 
     let connection_pool = configure_databse(&configuration.database).await;
 
-    tokio::spawn(zero2prod::startup::run(
-        listener,
-        connection_pool.clone(),
-        email_client,
-    ));
+    let app = Application::build(configuration)
+        .await
+        .expect("Failed to build application");
+
+    let address = format!("http://127.0.0.1:{}", app.port());
+
+    tokio::spawn(app.run_until_stopped());
 
     TestApp {
         address,

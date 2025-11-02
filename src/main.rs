@@ -1,8 +1,6 @@
-use sqlx::PgPool;
-use tokio::net::TcpListener;
 use zero2prod::configurations::get_configuration;
-use zero2prod::email_client::EmailClient;
-use zero2prod::startup::run;
+use zero2prod::startup::Application;
+
 use zero2prod::telemetry::{get_subscriber, init_subcriber};
 
 #[tokio::main]
@@ -13,26 +11,7 @@ async fn main() -> Result<(), std::io::Error> {
 
     let configuration = get_configuration().expect("Failed to read configuration");
 
-    let address = format!(
-        "{}:{}",
-        configuration.application.host, configuration.application.port
-    );
-    let db_pool = PgPool::connect_lazy_with(configuration.database.with_db());
+    let app = Application::build(configuration).await?;
 
-    let listener = TcpListener::bind(&address)
-        .await
-        .expect("Failed to bind to 127.0.0.1:8000");
-
-    let sender_email = configuration
-        .email_client
-        .sender()
-        .expect("Invalid sneder email address");
-
-    let email_client = EmailClient::new(
-        configuration.email_client.base_url,
-        sender_email,
-        configuration.email_client.authorization_token,
-    );
-
-    run(listener, db_pool, email_client).await
+    app.run_until_stopped().await
 }
